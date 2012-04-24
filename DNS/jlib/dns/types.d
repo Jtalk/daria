@@ -1,6 +1,35 @@
-﻿module jlib.dns.types;
+﻿/***********************************************************************
+	Copyright (C) 2012 Nazarenko Roman
 
-enum entry_type // DNS entry type
+	GNU GENERAL PUBLIC LICENSE - Version 3 - 29 June 2007
+
+	This file is part of DNS Proxy project.
+
+	DNS Proxy is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	DNS Proxy is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with DNS Proxy. If not, see <http://www.gnu.org/licenses/>.
+*************************************************************************/
+
+/**
+* Author: Nazarenko Roman <mailto: me@jtalk.me>
+* License: <http://www.gnu.org/licenses/gpl.html>
+*/
+
+/**
+	This module provides non-class types for DNS routines
+*/
+module jlib.dns.types;
+
+enum entry_type /// DNS entry type
 {
     A = 1,
     CNAME = 5,
@@ -10,7 +39,7 @@ enum entry_type // DNS entry type
 	UNKNOWN = 999
 };
 
-enum io_type // Shows whether we need to get or send DNS info. IN must be used, OUT is for future purposes
+enum io_type /// Shows whether we need to get or send DNS info. IN must be used, OUT is for future purposes
 {
     IN = 1
 };

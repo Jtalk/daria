@@ -11,9 +11,7 @@ const size_t	BUFFER_SIZE = 1024*4;
 class Socks4 : DummyTcpSocket
 {
 	alias Socks4	reference;
-private:
-	ubyte[] __user_id;
-		
+private:		
 	static
 	{
 		public const Address default_address;

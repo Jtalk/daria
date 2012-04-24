@@ -1,14 +1,48 @@
-﻿module jlib.dns.packet;
+﻿/***********************************************************************
+	Copyright (C) 2012 Nazarenko Roman
 
-import jlib.dns.types;
+	GNU GENERAL PUBLIC LICENSE - Version 3 - 29 June 2007
+
+	This file is part of DNS Proxy project.
+
+	DNS Proxy is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	DNS Proxy is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with DNS Proxy. If not, see <http://www.gnu.org/licenses/>.
+*************************************************************************/
+
+/**
+* Author: Nazarenko Roman <mailto: me@jtalk.me>
+* License: <http://www.gnu.org/licenses/gpl.html>
+*/
+
+/**
+	This is a DNS packet module. It provides programmer-friendly interface
+	to work with DNS packets.
+
+	It would be great to understand DNS packets before use this module.
+*/
+module jlib.dns.packet;
+
 import std.bitmanip : bigEndianToNative, nativeToBigEndian;
-debug import std.cstream;
 import std.conv : text;
 import std.algorithm : splitter;
+import std.exception : enforce;
+
+import jlib.dns.types;
 
 
-
-
+/** 
+	Standard DNS packet class
+*/
 class Packet
 {
 	struct Question
@@ -16,8 +50,9 @@ class Packet
 		ubyte[] domain;
 		Type type;
 		Class _class;
-		ushort offset[2];
-		bool __isProcessed; // shows whether this answer is proceeded (all links has been changed with essential values
+		ushort offset[2]; // Domain offset to use in decompression
+		bool __isProcessed; // shows whether this answer is proceeded (all 
+		// links has been changed with essential values)
 	}
 	
 	struct Answer
@@ -30,143 +65,201 @@ class Packet
 		ushort _length;
 		ubyte[] data;
 		ushort data_offset[2];
-		bool __isProcessed; // shows whether this answer is proceeded (all links has been changed with essential values
+		bool __isProcessed; // shows whether this answer is proceeded (all 
+		// links has been changed with essential values)
 	}
+
+	/// Packet offset represents the offset of the header (deprecated)
+	//static immutable packet_offset = 0x2a;
 	
 private:
 	Question[]	__questions;
 	Answer[] 	__answers;
 	bool 		__isRequest;
 	
-	static immutable packet_offset = 0x2a;
-	
-	ubyte[] decompress(ubyte[] data)
+	/**
+		Decompresses domain name presented.
+
+		Params:
+			data	= domain name to decompress
+
+		Returns:
+			domain name decompressed
+	*/
+	ubyte[] 
+	decompress(ubyte[] data)
 	{
-		ubyte[] searchForJump(ref ushort toJump)
+		/// Local function to search presented offset in all questions and answers
+		ubyte[] 
+		searchForJump(ref ushort toJump)
 		{
 			foreach( ref quest ; __questions)
 			{
-				debug dout.writeLine("searchForJump0 " ~ text(quest.offset) ~ " " ~ text(toJump)); // !!!!!!!!!!!!!!
 				with( quest)
 					if ( offset[0] <= toJump && offset[1] > toJump)
 						return domain[ toJump - offset[0] .. $ ];
+				// The dark magic, forget this.
 			}
+
 			foreach( ref ans ; __answers)
 			{
 				with(ans)
 				{
-					debug dout.writeLine("searchForJump0 " ~ text(ans.offset) ~ " " ~ text(toJump)); // !!!!!!!!!!!!!!
-				
 					if ( offset[0] <= toJump && offset[1] > toJump)
 						return domain[ toJump - offset[0] .. $ ];
 					
-					debug dout.writeLine("searchForJump0 " ~ text(ans.data_offset) ~ " " ~ text(toJump)); // !!!!!!!!!!!!!!
 					if ( data_offset[0] <= toJump && data_offset[1] > toJump)
 						return data[ toJump - data_offset[0] .. $ ];
-					}
-			}		
-			assert(0, "Error while decompress");
+				}
+				// The dark magic again.
+			}
+
+			enforce(0, "Error while decompress: no offset found");
 		}
 		
-		debug dout.writeLine("decompress0 " ~ cast(string)data); // !!!!!!!!!!!!!!
-		size_t first;
+		size_t first; // Index of the first 
+		ubyte temp = void; // Forget it
 		do {
-			if ((data[first] & 0b_1100_0000) == 0xc0)
+			if ((data[first] & 0b_1100_0000) == 0xc0) // If compression found
 			{
-				debug dout.writeLine("decompress1 " ~ cast(string)data); // !!!!!!!!!!!!!!
-				ubyte[2] toJumpBin = data[first .. first+2];
-				toJumpBin[0] &= 0b_0011_1111;
+				ubyte[2] toJumpBin = data[first .. first+2]; // copy link
+
+				// zeroize first 2 bits. They're only to make us know 
+				// about compression.
+				toJumpBin[0] &= 0b_0011_1111; 
+
+				// Make jump offset
 				ushort toJump = bigEndianToNative!(ushort, 2)(toJumpBin);
-				data = data[0 .. first] ~ searchForJump(toJump);
-				debug dout.writeLine("decompress2 " ~ cast(string)data); // !!!!!!!!!!!!!!
+
+				// Add compressed data to the end of the domain
+				data = data[0 .. first] ~ searchForJump(toJump); 
 				break;
 			}
-			ubyte temp = data[first];
+
+			// Some kind of swapping
+			temp = data[first];
 			data[first] = '.';
-			first += temp + 1;
+			first += temp + 1; // first now points to the byte next to '.'
+
 		} while ( first < data.length);
 		return data;
 	}
 	
-protected:		
-	void parseAnswer(ushort number)
+protected:
+	/// General parsers
+	/**
+		Parses answers and decompresses all the stuff inside.
+		
+		Params: 
+			number	= index of answer to parse.
+	*/
+	void 
+	parseAnswer(ushort number)
 	in
 	{
+		// Preparse all the questions
 		if (!__questions[$-1].__isProcessed)
 			parseQuestion(number);
-		if (number != 0)
+
+		// Preparse all previous answers
+		if (number)
 			parseAnswer(cast(ushort)(number-1));
 	}
 	body
 	{
+		// Do nothing if answer is already parsed
 		if ( __answers[number].__isProcessed)
 			return;
 		
 		with (__answers[number]) 
 		{
 			domain = decompress( domain );
+
 			if ( type == entry_type.A 
-				|| type == entry_type.AAAA
-				|| type == entry_type.TXT) 
+				|| type == entry_type.AAAA) 
 			{
 			} // These types does not require decompression
+			else if ( type == entry_type.TXT )
+				data = data[1 .. $]; // Remove initial trash of the TXT entry
+				// Does not require decompression too
 			else
 			{
 				// Does require decompression
-				debug dout.writeLine("parseAnswer NotA " ~ cast(string)domain); // !!!!!!!!!!!!!!
 				data = decompress(data);	
 				data = data[1 .. $];
-				debug dout.writeLine("parseAnswer A " ~ cast(string)data); // !!!!!!!!!!!!!!
 			}
 			__isProcessed = true;
 		}
 	}
-			
-	void parseQuestion(ushort number)
+		
+	/**
+		Parses answers and decompresses all the stuff inside.
+
+		Params: 
+		number	= index of answer to parse.
+	*/
+	void 
+	parseQuestion(ushort number)
 	in
 	{
+		// Parse previous questions
 		if ( number && !__questions[number-1].__isProcessed)
 			parseQuestion(cast(ushort)(number-1));
 	}
 	body
 	{
+		// If already processed, do nothing
 		if (__questions[number].__isProcessed)
 			return;
 		
 		with( __questions[number])
 		{
-			debug dout.writeLine("parseQuestion " ~ cast(string)domain); // !!!!!!!!!!!!!!!
+			// Domains always require decompressio, even for PTR.
 			domain = decompress(domain);
 			domain = domain[1 .. $];
 			__isProcessed = true;
 		}
-		
 	}
 		
 public:
+	/// Packet header's data
 	ushort id;
 	ushort flags;
 	ushort questions_count;
 	ushort answers_count;
 	ushort authoritative_answers_count;
 	ushort additional_answers_count;
-	uint total_answers_count;
+
+	uint total_answers_count; /// Sum of three answers counts above
 	
-	ubyte return_code;
+	ubyte return_code; /// DNS return code
 	
-	
+	/**
+		The default constructor
+	*/
 	this() {}
+
+	/**
+		Constructor. Builds a packet from the binary representation provided.
+
+		The packet must be correct. If not, behaviour is unspecified. Out of range 
+		exception may be thrown if byte string is less than must be, or some
+		values may become incorrect. An application must control values itself.
+	
+		Params:
+			packet	= byte representation of the DNS packet.
+	*/
 	this(ubyte[] packet)
 	{
 		size_t current_offset = void;
 		
-		ubyte pair[2];
+		ubyte pair[2]; // Ubyte's short value representation
 		pair = packet[0 .. 2];
 		id = bigEndianToNative!(ushort, 2)(pair);
 		
 		pair = packet[2 .. 4];
 		flags = bigEndianToNative!(ushort, 2)(pair);
-		return_code = cast(ubyte)(flags & 0b_1111);
+		return_code = cast(ubyte)(flags & 0b_1111); 
 		
 		pair = packet[4 .. 6];
 		questions_count = bigEndianToNative!(ushort, 2)(pair);
@@ -181,30 +274,31 @@ public:
 		additional_answers_count = bigEndianToNative!(ushort, 2)(pair);
 		
 		total_answers_count = answers_count + authoritative_answers_count 
-			+ additional_answers_count;
+			+ additional_answers_count; // Evaluates total count
 		
-		packet = packet[12 .. $];
+		packet = packet[12 .. $]; // Cutting header off
 		current_offset = 12;
 		
 		__questions = new Question[questions_count];
-		size_t len = void;
-		ushort i;
-		for(  ; i < questions_count; i++)
+		size_t len = void; // The length of the next part of the url
+		for( ushort i; i < questions_count; i++) // Foreach
 		{
 			len = 0;
 			with( __questions[i])
 			{
 				do {
-					if ((packet[len] & 0b_1100_0000) == 0xc0)
+					if ((packet[len] & 0b_1100_0000) == 0xc0) // If compressed
 					{
 						len += 2;
-						break;
+						break; // Stop the value parsing. 
 					}
-					len += packet[len] + 1;
+					len += packet[len] + 1; // Next part of the domain entry
 				} while( packet[len] != 0);
 				
-				domain = packet[0 .. len].dup;
-				packet = packet[len+1 .. $];
+				domain = packet[0 .. len].dup; // Copy the question's domain
+				packet = packet[len+1 .. $]; // Cut packet
+
+				// Set offsets
 				offset[0] = cast(ushort)current_offset;
 				offset[1] = cast(ushort)( current_offset += len + 1);
 				
@@ -214,72 +308,83 @@ public:
 				pair = packet[2 .. 4];
 				_class = bigEndianToNative!(ushort, 2)(pair);
 			}
-			packet = packet[4 .. $];
+			packet = packet[4 .. $]; // Cutting type and class off
 			current_offset += 4;
 		}
 		
-		
+		// Process answers
 		__answers = new Answer[total_answers_count];
-		ubyte[4] quad = void;
-		packet ~= 0;
-		debug dout.writeLine("Packet.this(ubyte[]) total: " ~ text(total_answers_count));
-		for( i = 0; i < total_answers_count; i++)
+		ubyte[4] quad = void; // ubyte representation of int to get answer length
+		packet ~= 0; // Dunno Y it's there
+		// Maybe to avoid out of range violation 
+		
+		for( uint i = 0; i < total_answers_count; i++) // Foreach
 		{
 			len = 0;
 			with( __answers[i])
 			{
 				do {
-					debug dout.writeLine("Packet.this(ubyte[]) len: " ~ text(packet[len]));
-					if ((packet[len] & 0b_1100_0000) == 0xc0)
+					if ((packet[len] & 0b_1100_0000) == 0xc0) // If compression
 					{
 						len += 2;
-						break;
+						break; // Get the compression pointer and stop the processing
 					}
-					len += packet[len] + 1;
-					//debug dout.writeLine("Packet.this(ubyte[]) packet: " ~ text(packet));
-					debug dout.writeLine("Packet.this(ubyte[]) new data: " ~ text([len, packet.length]));
+					len += packet[len] + 1; // Next part
 				} while( packet[len] != 0);
-				domain = packet[0 .. len].dup;
-				debug dout.writeLine("Packet.this(ubyte[]) " ~ text( domain));
+
+				domain = packet[0 .. len].dup; 
 				packet = packet[len .. $];
 				offset[0] = cast(ushort)current_offset;
 				offset[1] = cast(ushort)(current_offset += len);
 				
 				pair = packet[0 .. 2];
 				type = bigEndianToNative!(ushort, 2)(pair);
-				debug dout.writeLine("Packet.this(ubyte[]) type: " ~ text(type));
 				
 				pair = packet[2 .. 4];
 				_class = bigEndianToNative!(ushort, 2)(pair);
-				debug dout.writeLine("Packet.this(ubyte[]) class: " ~ text(_class));
 				
 				quad = packet[ 4 .. 8];
 				ttl = bigEndianToNative!(TTL, 4)(quad);
-				debug dout.writeLine("Packet.this(ubyte[]) ttl: " ~ text(ttl));
 				
 				pair = packet[8 .. 10];
 				_length = bigEndianToNative!(ushort, 2)(pair);
-				debug dout.writeLine("Packet.this(ubyte[]) length: " ~ text(_length));
 				
 				data_offset[0] = cast(ushort)(current_offset += 10);
 				data_offset[1] = cast(ushort)(current_offset += _length);
-				data = packet[10 .. 10+_length].dup;
-				debug dout.writeLine("Packet.this(ubyte[]) data: " ~ text(data));
+				data = packet[10 .. 10+_length].dup; // Getting answer's data
+				// Since there're length field, we need no monkey business 
+				// to get the entire field.
 				
-				packet = packet[10+_length .. $];
-				//debug dout.writeLine("this() pack: " ~ text(packet));
+				packet = packet[10+_length .. $]; // Goto next answer
 			}
-		}
-		
+		}	
 	}
 	
+	/**
+		Destructor. Deletes questions and answers to make this class be able 
+		to work in non-GC environment.
+	*/
 	~this() 
 	{
 		delete __questions;
 		delete __answers;
 	}
 	
-	Answer getAnswer(ushort number)
+	/// Received data.
+	/**
+		Extracts the answer of the number specified.
+
+		Params:
+			number	= number of answer to return.
+
+		Returns:
+			Answer structure.
+
+		Throws:
+			An assert exception if number is out of range.
+	*/
+	Answer 
+	getAnswer(ushort number)
 	in
 	{
 		assert(number < __answers.length, r"Number is out of range in answers");
@@ -290,7 +395,20 @@ public:
 		return __answers[number];
 	}
 	
-	Question getQuestion(ushort number)
+	/**
+		Extracts the question of the number specified.
+
+		Params:
+			number	= number of question to return.
+
+		Returns:
+			Question structure.
+
+		Throws:
+		An assert exception if number is out of range.
+	*/
+	Question 
+	getQuestion(ushort number)
 	in
 	{
 		assert(number < __questions.length, r"Number is out of range in questions");
@@ -301,8 +419,20 @@ public:
 		return __questions[number];
 	}
 		
-	
-	string getData(ushort number)
+	/**
+	Extracts the answer's data of the number specified.
+
+	Params:
+		number	= number of answer.
+
+	Returns:
+		string representing answer's data.
+
+	Throws:
+		An assert exception if number is out of range.
+	*/
+	string 
+	getData(ushort number)
 	in
 	{
 		assert(number < __answers.length, r"Number is out of range in answers' data");
@@ -315,17 +445,43 @@ public:
 				cast(string) __answers[number].data);
 	}
 	
-	void addQuestion(Question toAdd)
+	/// Making data to send.
+	/**
+		Adds the question specified to the questions array.
+		
+		Params:
+			toAdd	= Question to add to the array.
+	*/
+	void 
+	addQuestion(Question toAdd)
 	{
 		__questions ~= toAdd;
 	}
 	
-	void addAnswer(Answer toAdd)
+	/**
+		Adds the answer specified to the answers array.
+
+		Params:
+			toAdd	= Answer to add to the array.
+	*/
+	void 
+	addAnswer(Answer toAdd)
 	{
 		__answers ~= toAdd;
 	}
 	
-	ubyte[] makePacket()
+	/// Packet finalizing.
+	/**
+		Builds a binary representation of this packet. 
+
+		Note that questions_count is ignored, using length of the questions array
+		instead.
+
+		Returns:
+			Binary representation of the current packet.
+	*/
+	ubyte[] 
+	makePacket()
 	{
 		alias nativeToBigEndian ntb;
 		ubyte[] packet = (
@@ -336,18 +492,28 @@ public:
 			ntb(authoritative_answers_count) ~
 			ntb(additional_answers_count)
 			); // header is ready
-		debug dout.writeLine("__questions.length: " ~ text(__questions.length));
-		ubyte[] domainToRequest(ubyte[] domain)
+
+		/**
+			The subroutine to convert domain name to the DNS request. 
+		*/
+		ubyte[] 
+		domainToRequest(ubyte[] domain)
 		{
+			// Splitting the domain to its parts.
 			auto domains = splitter(domain, cast(ubyte)'.');
-			ubyte[] acc;
+
+			ubyte[] acc; // Domain accumulator
 			foreach( dom; domains)
 				acc ~= ( cast(ubyte) dom.length
-						~ dom );
+						~ dom ); // Adding part's length and the part itself.
 			return acc;
 		}
-		
-		ubyte[] makeQuestion(ref Question quest) 
+
+		/**
+			The subroutine to convert Question structure to the byte string.
+		*/
+		ubyte[] 
+		makeQuestion(ref Question quest) 
 		{			
 			ubyte[] question = (
 				domainToRequest(quest.domain) ~ 
@@ -356,7 +522,14 @@ public:
 				nativeToBigEndian(quest._class));
 			return question;			
 		}
-		ubyte[] makeAnswer(ref Answer ans)
+
+		/**
+			The subroutine to convert Answer structure to the byte string.
+			
+			Bugs: unable to compress domains (and probably will never be).
+		*/
+		ubyte[] 
+		makeAnswer(ref Answer ans)
 		{
 			ubyte[] answer = (
 				domainToRequest(ans.domain) ~
@@ -364,7 +537,7 @@ public:
 				nativeToBigEndian(ans._class) ~
 				nativeToBigEndian(ans.ttl) ~
 				nativeToBigEndian(ans._length) ~
-				ans.data); // No compression for a while
+				ans.data); 
 			return answer;
 		}
 		
