@@ -40,7 +40,7 @@ import jlib.dns.packet;
 public import jlib.dns.types;
 
 private const size_t	DNS_HEADER_SIZE = 12; 
-private const size_t	DNS_BUFFER_SIZE = 1024*4; /// The size of the receive buffer of the socket			
+private const size_t	DNS_BUFFER_SIZE = 512; /// The size of the receive buffer of the socket			
 
 
 /**
