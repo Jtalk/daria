@@ -115,6 +115,7 @@ private:
 			}
 
 			enforce(0, "Error while decompress: no offset found");
+			return null;
 		}
 		
 		size_t first; // Index of the first 

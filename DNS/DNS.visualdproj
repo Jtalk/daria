@@ -194,7 +194,6 @@
   <File path="jlib\dns\core.d" />
   <File path="jlib\dns\dns.d" />
   <File path="jlib\dns\packet.d" />
-  <File path="jlib\dns\parser.d" />
   <File path="jlib\dns\types.d" />
  </Folder>
 </DProject>

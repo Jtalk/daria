@@ -1,9 +1,9 @@
 <DProject>
- <ProjectGuid>{D542F4DC-8630-441F-92DC-BBE3A428ED53}</ProjectGuid>
+ <ProjectGuid>{7253B27D-86BF-444C-8E7A-2EFCED199F49}</ProjectGuid>
  <Config name="Debug" platform="Win32">
   <obj>0</obj>
   <link>0</link>
-  <lib>0</lib>
+  <lib>1</lib>
   <multiobj>0</multiobj>
   <singleFileCompilation>0</singleFileCompilation>
   <oneobj>0</oneobj>
@@ -45,7 +45,7 @@
   <compiler>0</compiler>
   <otherDMD>0</otherDMD>
   <program>$(DMDInstallDir)windows\bin\dmd.exe</program>
-  <imppath>../DNS;../Proxy;</imppath>
+  <imppath />
   <fileImppath />
   <outdir>$(ConfigurationName)</outdir>
   <objdir>$(OutDir)</objdir>
@@ -81,7 +81,7 @@
   <libpaths />
   <deffile />
   <resfile />
-  <exefile>$(OutDir)\$(ProjectName).exe</exefile>
+  <exefile>$(OutDir)\$(ProjectName).lib</exefile>
   <additionalOptions />
   <preBuildCommand />
   <postBuildCommand />
@@ -98,7 +98,7 @@
  <Config name="Release" platform="Win32">
   <obj>0</obj>
   <link>0</link>
-  <lib>0</lib>
+  <lib>1</lib>
   <multiobj>0</multiobj>
   <singleFileCompilation>0</singleFileCompilation>
   <oneobj>0</oneobj>
@@ -176,7 +176,7 @@
   <libpaths />
   <deffile />
   <resfile />
-  <exefile>$(OutDir)\$(ProjectName).exe</exefile>
+  <exefile>$(OutDir)\$(ProjectName).lib</exefile>
   <additionalOptions />
   <preBuildCommand />
   <postBuildCommand />
@@ -190,10 +190,11 @@
   <pauseAfterRunning>0</pauseAfterRunning>
   <filesToClean>*.obj;*.cmd;*.build;*.json;*.dep</filesToClean>
  </Config>
- <Folder name="Daria">
-  <File path="main.d" />
-  <File path="routines.d" />
-  <File path="types.d" />
-  <File path="worker.d" />
+ <Folder name="Proxy">
+  <File path="jlib\proxy\core.d" />
+  <File path="jlib\proxy\dummy_tcp_socket.d" />
+  <File path="lib.d" />
+  <File path="jlib\proxy\proxy.d" />
+  <File path="jlib\proxy\types.d" />
  </Folder>
 </DProject>

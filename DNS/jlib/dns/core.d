@@ -33,13 +33,14 @@ module jlib.dns.core;
 import std.socket : UdpSocket, Address, InternetAddress, getAddress, SocketOSException;
 import std.exception : enforce;
 import std.bitmanip : nativeToBigEndian;
+import std.array : empty;
 
 import jlib.dns.packet;
 
 public import jlib.dns.types;
 
-const size_t	DNS_HEADER_SIZE = 12; 
-const size_t	BUFFER_SIZE = 1024*4; /// The size of the receive buffer of the socket			
+private const size_t	DNS_HEADER_SIZE = 12; 
+private const size_t	DNS_BUFFER_SIZE = 1024*4; /// The size of the receive buffer of the socket			
 
 
 /**
@@ -49,7 +50,7 @@ const size_t	BUFFER_SIZE = 1024*4; /// The size of the receive buffer of the soc
 	It does not implement all the standard query types, only some frequently 
 	used ones.
  */
-class dns_socket : UdpSocket
+class DnsSocket : UdpSocket
 {
 	/// Server initialization part
 
@@ -63,14 +64,18 @@ class dns_socket : UdpSocket
 	 
 		User classes may be able to recall the init_server routine if something goes
 		wrong. 
+
+		Params:
+			address	= address of the dns server to connect.
+			port	= port of the remote dns server.
 	
 		Bugs: Doesn't work as well as expected :( 
 	 */
 	void 
-	init_server()
+	init_server(string address = "", ushort port = 0)
 	{
-		string address = "8.8.8.8";
-		__dns_server = getAddress(address, this.__dns_port)[0];
+		address = (address.empty ? "208.67.222.222" : address);
+		__dns_server = getAddress(address, ( port ? port : this.__dns_port) )[0];
 	}
 	
 	/// Server connection
@@ -83,6 +88,7 @@ class dns_socket : UdpSocket
 	{
 		bind();
 		connect(__dns_server);
+		buffer_s = DNS_BUFFER_SIZE;
 	}
 
 	/** 
@@ -110,13 +116,24 @@ class dns_socket : UdpSocket
 	
 public:
 	/** 
-		The default (and the only) constructor. Calls all the initial routines and
+		The default constructor. Calls all the initial routines and
 		makes the class ready to work with the DNS.
 	 */
 	this() 
 	{ 
 		super();
 		init_server();	
+		init();
+	}
+
+	/** 
+		Constructor. Makes us able to choose DNS server address and port. Calls all the initial routines and
+		makes the class ready to work with the DNS.
+	*/
+	this(string address, ushort port = 0)
+	{
+		super();
+		init_server(address, port);
 		init();
 	}
 
@@ -130,6 +147,7 @@ public:
 	}
 	
 	/// IO operations
+	private uint buffer_s;
 	/** 
 		Sends the packet to the DNS server in this class. 
 	
@@ -167,11 +185,12 @@ public:
 	{
 		// TODO: Put getErrorText() to the exception's message. 
 		// There was some issues with that when I tried.
-		ubyte[] buffer = new ubyte[ BUFFER_SIZE ];
+		ubyte[] buffer = new ubyte[ buffer_s ];
+		size_t received = super.receive(buffer);
 		enforce( 
-				super.receive(buffer) > 0, 
+				 received > 0, 
 				"Unable to receive in dns_socket.receive()");
-		return new Packet(buffer);
+		return new Packet(buffer[ 0 .. received]);
 	}
 	
 	/// Properties
@@ -189,6 +208,18 @@ public:
 		*/
 		string address() { return __dns_server.toAddrString; }
 		string address(string new_addr) { __dns_server = getAddress( new_addr, this.__dns_port)[0]; return new_addr; }
+
+		/**
+			Socket's receive buffer size property.
+
+			Params:
+				newsize = new size of the receive buffer.
+
+			Returns:
+				current size of the receive buffer.
+		*/
+		uint buffer_size() { return buffer_s; }
+		uint buffer_size(uint newsize) { buffer_s = newsize > 0 ? newsize : DNS_BUFFER_SIZE; return buffer_s; }
 	}
 
 	/// Deprecated methods, they will be removed as soon as possible.
