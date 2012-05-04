@@ -30,7 +30,7 @@
 */
 module jlib.dns.core;
 
-import std.socket : UdpSocket, Address, InternetAddress, getAddress, SocketOSException;
+import std.socket : UdpSocket, Address, InternetAddress, getAddress, SocketOSException, wouldHaveBlocked;
 import std.exception : enforce;
 import std.bitmanip : nativeToBigEndian;
 import std.array : empty;
@@ -74,7 +74,7 @@ class DnsSocket : UdpSocket
 	void 
 	init_server(string address = "", ushort port = 0)
 	{
-		address = (address.empty ? "208.67.222.222" : address);
+		address = (address.empty ? "8.8.8.8" : address);
 		__dns_server = getAddress(address, ( port ? port : this.__dns_port) )[0];
 	}
 	
@@ -88,7 +88,7 @@ class DnsSocket : UdpSocket
 	{
 		bind();
 		connect(__dns_server);
-		buffer_s = DNS_BUFFER_SIZE;
+		__buffer_s = DNS_BUFFER_SIZE;
 	}
 
 	/** 
@@ -147,7 +147,7 @@ public:
 	}
 	
 	/// IO operations
-	private uint buffer_s;
+	private uint __buffer_s;
 	/** 
 		Sends the packet to the DNS server in this class. 
 	
@@ -185,11 +185,11 @@ public:
 	{
 		// TODO: Put getErrorText() to the exception's message. 
 		// There was some issues with that when I tried.
-		ubyte[] buffer = new ubyte[ buffer_s ];
+		ubyte[] buffer = new ubyte[ __buffer_s ];
 		size_t received = super.receive(buffer);
 		enforce( 
 				 received > 0, 
-				"Unable to receive in dns_socket.receive()");
+				wouldHaveBlocked() ? "empty" : "Error while receive");
 		return new Packet(buffer[ 0 .. received]);
 	}
 	
@@ -218,8 +218,8 @@ public:
 			Returns:
 				current size of the receive buffer.
 		*/
-		uint buffer_size() { return buffer_s; }
-		uint buffer_size(uint newsize) { buffer_s = newsize > 0 ? newsize : DNS_BUFFER_SIZE; return buffer_s; }
+		size_t buffer_s() { return __buffer_s; }
+		size_t buffer_s(size_t newsize) { __buffer_s = newsize > 0 ? newsize : DNS_BUFFER_SIZE; return __buffer_s; }
 	}
 
 	/// Deprecated methods, they will be removed as soon as possible.

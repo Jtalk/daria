@@ -370,7 +370,22 @@ public:
 		delete __questions;
 		delete __answers;
 	}
-	
+
+	/**
+	Copying method. Makes a copy of this class.
+	Return:
+	A copy of the caller class
+	*/
+	deprecated Packet copy()
+	{
+		Packet newp = new Packet();
+		newp.id = id;
+		newp.flags = flags;
+		newp.return_code = return_code;
+
+		return newp;
+	}
+
 	/// Received data.
 	/**
 		Extracts the answer of the number specified.
