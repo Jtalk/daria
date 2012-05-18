@@ -400,7 +400,7 @@ public:
 			An assert exception if number is out of range.
 	*/
 	Answer 
-	getAnswer(ushort number)
+	getAnswer(ushort number = 0)
 	in
 	{
 		assert(number < __answers.length, r"Number is out of range in answers");
@@ -424,7 +424,7 @@ public:
 		An assert exception if number is out of range.
 	*/
 	Question 
-	getQuestion(ushort number)
+	getQuestion(ushort number = 0)
 	in
 	{
 		assert(number < __questions.length, r"Number is out of range in questions");
@@ -448,7 +448,7 @@ public:
 		An assert exception if number is out of range.
 	*/
 	string 
-	getData(ushort number)
+	getData(ushort number = 0)
 	in
 	{
 		assert(number < __answers.length, r"Number is out of range in answers' data");
@@ -534,8 +534,8 @@ public:
 			ubyte[] question = (
 				domainToRequest(quest.domain) ~ 
 				0 ~
-				nativeToBigEndian(quest.type) ~ 
-				nativeToBigEndian(quest._class));
+				nativeToBigEndian(quest.type ? quest.type : cast(ushort)entry_type.A) ~ 
+				nativeToBigEndian(quest._class ? quest._class : cast(ushort)io_type.IN));
 			return question;			
 		}
 

@@ -48,5 +48,11 @@ alias ushort Type;
 alias ushort Class;
 alias uint TTL;
 
+immutable {
+	size_t	DNS_HEADER_SIZE = 12; 
+	size_t	DNS_BUFFER_SIZE = 512; /// The size of the receive buffer of the socket	
+	size_t	DNS_PACKET_MAXLEN = 250/2; // ?
+}
+
 
 
