@@ -50,3 +50,22 @@ parseNeeds( string need)
 	auto needs = map!"parse!size_t( a)"( strNeeds);
 	return needs;
 }
+
+string[] 
+cut( string str, size_t num, size_t chunk_len) 
+{
+	string[] buffer;
+	for (size_t i; i < num-1; ++i)
+		buffer ~= str[i * chunk_len .. (i+1) * chunk_len];
+	buffer ~= str[(num-1) * chunk_len .. $]; // Optimization
+	return buffer;
+}
+
+ubyte[] 
+makeDomain( string[] parts...) 
+{
+	string buffer;
+	foreach( part; parts)
+		buffer ~= ( part ~ '.');
+	return cast(ubyte[]) buffer[ 0 .. $-1];
+}

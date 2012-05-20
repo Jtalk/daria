@@ -42,8 +42,9 @@ public:
 	
 	override ptrdiff_t send(const(void)[] data)
 	{
-		enforce( super.send(data) > 0, r"Socket send error");
-		return 0; // stupid language
+		ptrdiff_t ret = super.send(data);
+		enforce( ret > 0, r"Socket send error");
+		return ret; // stupid language
 	}
 	
 	ubyte[] receive()

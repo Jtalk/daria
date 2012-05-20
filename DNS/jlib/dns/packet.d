@@ -367,8 +367,8 @@ public:
 	*/
 	~this() 
 	{
-		delete __questions;
-		delete __answers;
+		//delete __questions;
+		//delete __answers;
 	}
 
 	/**

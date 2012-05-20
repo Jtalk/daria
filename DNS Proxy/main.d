@@ -6,6 +6,7 @@ import std.getopt;
 import core.thread;
 import std.base64;
 import std.string;
+import core.exception, std.exception;
 
 import jlib.proxy.proxy;
 import jlib.dns.dns;
@@ -13,6 +14,7 @@ import jlib.dns.dns;
 import routines;
 import types;
 import worker;
+static import dbg;
 
 //void main() 
 //{
@@ -61,9 +63,8 @@ void main(string[] argv)
 		passwd = "passwd";
 		textOpt[DOMAIN] = "d.jtalk.me";
 
-		dout.writeLine( "Start test:");
-		dout.writeLine( textOpt[LOGIN] ~ ':' ~ passwd ~ ':' ~ text(textOpt[LOGIN].empty));
-		dout.flush();
+		dbg.report!0( "Start test:\n", textOpt[LOGIN], ":", passwd, ":", text(textOpt[LOGIN].empty));
+		//dout.flush();
 		//din.getc();
 	}
 
@@ -72,7 +73,7 @@ void main(string[] argv)
 		textOpt[DOMAIN] = textOpt[DOMAIN][ 1 .. $];
 
 	try {
-		DnsSocket dns_socket = new DnsSocket( textOpt[DNS_SERVER]);
+		//DnsSocket dns_socket = new DnsSocket( textOpt[DNS_SERVER]);
 		//dns_socket.buffer_size = numOpt[BUFFER_SIZE];
 
 
@@ -89,23 +90,23 @@ void main(string[] argv)
 		ThreadGroup threads = new ThreadGroup();
 		Proxy accepted;
 		// Main cycle
-		while(1){	
+		while(1) {	
 			accepted = proxy.accept();
 			
 			threads.add(
-						new Worker( textOpt[LOGIN], userID, dns_socket, accepted, textOpt[DOMAIN] )
+						new Worker( textOpt[LOGIN], userID, textOpt[DNS_SERVER], accepted, textOpt[DOMAIN] )
 						);
 
 			foreach( ref curThread; threads)
-			{
 				if ( !curThread.isRunning )
 					threads.remove( curThread);
-			}
 		}
 	}
-	catch (Exception ex)
+	catch (Throwable ex)
 	{
-		dout.writeLine(ex.msg);
+		writeln(ex.msg, ex.file);
+		writeln( "STOP");
 	}
+	writeln( "BICYCLE");
 }
 

@@ -143,7 +143,7 @@ public:
 	 */
 	~this() 
 	{
-		delete __dns_server; // Untested! 
+		//delete __dns_server; // Untested! 
 	}
 	
 	/// IO operations

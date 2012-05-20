@@ -59,6 +59,7 @@ immutable {
 	size_t MIN_STATUS = 4;
 
 	size_t TOKEN_MAXLEN = 8;
+	size_t DNS_MAXPART = 62;
 
 	ushort FLAGS = 0b_0000_0001_0000_0000;
 }
