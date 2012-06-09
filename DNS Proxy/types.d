@@ -15,7 +15,8 @@ enum {
 immutable 
 
 enum {
-	BUFFER_SIZE
+	BUFFER_SIZE,
+	LOGLEVEL
 };
 immutable 
 
@@ -26,7 +27,7 @@ enum {
 /// Sizes:
 immutable {
 	int TEXT_OPTIONS_SIZE = 3;
-	int NUMERIC_OPTIONS_SIZE = 1;
+	int NUMERIC_OPTIONS_SIZE = 2;
 	int SWITCHER_OPTIONS_SIZE = 1;
 }
 

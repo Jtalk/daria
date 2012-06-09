@@ -1,3 +1,29 @@
+/***********************************************************************
+	Copyright (C) 2012 Nazarenko Roman
+
+	GNU GENERAL PUBLIC LICENSE - Version 3 - 29 June 2007
+
+	This file is part of Daria project.
+
+	Daria is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	Daria is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with Daria. If not, see <http://www.gnu.org/licenses/>.
+*************************************************************************/
+
+/**
+* Author: Nazarenko Roman <mailto: me@jtalk.me>, Schevchenko Igor
+* License: <http://www.gnu.org/licenses/gpl.html>
+*/
+
 module main;
 
 import std.stdio;
@@ -16,65 +42,42 @@ import types;
 import worker;
 static import dbg;
 
-//void main() 
-//{
-//    DnsSocket socket = new DnsSocket();
-//    Packet pack = new Packet();
-//    pack.id = 10044;
-//    pack.flags = 0b1_0000_0000;
-//    Packet.Question quest;
-//    quest.domain = cast(ubyte[])"aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.aaaaaaaaa.yandex.ru";
-//
-//    pack.addQuestion( quest);
-//    
-//    socket.send( pack);
-//    pack = socket.receive();
-//    
-//    //din.getc();
-//}
-
 void main(string[] argv)
 {
 	string[]	textOpt			= new string[ TEXT_OPTIONS_SIZE ];
 	passwd_type passwd;				// May use encryption later, just a string for now
 	int[]		numOpt			= new int[ NUMERIC_OPTIONS_SIZE ];
 	bool[]		switchersOpt	= new bool[ SWITCHER_OPTIONS_SIZE ];
-
-	// D auto-initialization must work? 
-	//textOpt[LOGIN] = "";
-	//passwd = "";
-
 	getopt( argv,
 		   "login|l", &(textOpt[LOGIN]),
 		   "password|p", &passwd,
 		   "server|s", &textOpt[DNS_SERVER],
 		   "domain|d", &textOpt[DOMAIN],
 		   "buffer-size|b", &numOpt[BUFFER_SIZE],
-		   "forking|f", &switchersOpt[FORKING]
+		   "forking|f", &switchersOpt[FORKING],
+		   "error|e", &numOpt[LOGLEVEL],
 		);
 
 	version( Windows)
 		switchersOpt[FORKING] = false;
 
-	//assert( !textOpt[LOGIN].empty || !passwd.empty, "Error: no login or password presented");
+	dbg.logLevel = numOpt[LOGLEVEL];
+
+
+	assert( !textOpt[LOGIN].empty || !passwd.empty, "Error: no login or password presented");
 	// ATTENTION! NEEDED!
 	debug {
 		textOpt[LOGIN] = "login";
 		passwd = "passwd";
 		textOpt[DOMAIN] = "d.jtalk.me";
-
-		dbg.report!0( "Start test:\n", textOpt[LOGIN], ":", passwd, ":", text(textOpt[LOGIN].empty));
-		//dout.flush();
-		//din.getc();
+		numOpt[LOGLEVEL] = dbg.logLevel = 3;
 	}
+
+	dbg.report!1( "Start test:\n", textOpt[LOGIN], ":", passwd, ":", text(textOpt[LOGIN].empty));
 
 	// Look whether there're a first dot.
 	if ( textOpt[DOMAIN][0] == '.') 
 		textOpt[DOMAIN] = textOpt[DOMAIN][ 1 .. $];
-
-	try {
-		//DnsSocket dns_socket = new DnsSocket( textOpt[DNS_SERVER]);
-		//dns_socket.buffer_size = numOpt[BUFFER_SIZE];
 
 
 		Proxy proxy = new Proxy(Proxy.default_address);
@@ -82,19 +85,19 @@ void main(string[] argv)
 
 		UserID userID = Base64URL.encode(mkHash( textOpt[LOGIN], passwd));
 
-		//userID = std.string.translate(userID, ['+' : '-', '/' : '_'], ['=']);
-
 		// Remove '='s from the end of an ID
 		userID = removeBase64Suffix( userID);
 
 		ThreadGroup threads = new ThreadGroup();
 		Proxy accepted;
 		// Main cycle
+	try {
 		while(1) {	
 			accepted = proxy.accept();
+
 			
 			threads.add(
-						new Worker( textOpt[LOGIN], userID, textOpt[DNS_SERVER], accepted, textOpt[DOMAIN] )
+						new Worker( textOpt[LOGIN], userID, textOpt[DNS_SERVER], accepted, textOpt[DOMAIN], numOpt[LOGLEVEL] )
 						);
 
 			foreach( ref curThread; threads)

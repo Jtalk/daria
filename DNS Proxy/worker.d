@@ -20,7 +20,7 @@
 *************************************************************************/
 
 /**
-* Author: Nazarenko Roman <mailto: me@jtalk.me>, Schevchenko Igor
+* Author: Nazarenko Roman <mailto: me@jtalk.me>, Shevchenko Igor
 * License: <http://www.gnu.org/licenses/gpl.html>
 */
 
@@ -40,6 +40,7 @@ import std.string;
 import std.conv : text, parse;
 import std.math : ceil;
 import std.algorithm;
+import std.socket;
 
 import jlib.dns.dns;
 import jlib.proxy.proxy;
@@ -62,29 +63,31 @@ private:
 	string		__domain = void;
 	string		token = void;
 	string[]	parts = void;
+	size_t		__logLevel = void;
 
 public:
-	this( string login, UserID userID, string dns_server, Proxy proxy, string domain)
+	this( string login, UserID userID, string dns_server, Proxy proxy, string domain, size_t logLevel)
 	{
 		__login = login;
 		__userID = userID;
 		__dns_socket = new DnsSocket( dns_server);
 		__proxy = proxy;
 		__domain = domain;
+		__logLevel = logLevel;
 		super( &routine);
 		this.start();
 	}
 
-	~this() { }
+	~this() { dbg.report!1( "WORKER ENDS"); }
 
 private:
 	void
 	control( string T, string toControl) 
 	{
 		// We need it to be higher to prevent access violation when toControl is less than T
-		if (toControl.length < T.length)
-			toControl ~= "000000";
-		static assert( ERROR.length <= "000000".length ); // Looks if error became too long someways.
+		//if (toControl.length < T.length)
+		//	toControl ~= "000000";
+		//static assert( ERROR.length <= "000000".length ); // Looks if error became too long someways.
 
 		// Converts answer status header to lower case.
 		enforce(
@@ -101,7 +104,7 @@ private:
 		void send( size_t to_send)
 		{
 			ubyte[] domain = makeDomain( token, text(to_send), parts[to_send], __domain);
-			debug dbg.report!1("Domain: \n", cast(string)domain);
+			dbg.report!2("Domain: \n", cast(string)domain);
 
 			string toControl = io( domain, SEND).getData();
 			handle!SEND(toControl);
@@ -117,14 +120,10 @@ private:
 
 	string[] 
 	receiveParts(size_t number)
-	in
 	{
 		static assert( bool.init == false);
 		assert( number, "Number == 0 in Worker.receiveParts()");
-	}
-	body
-	{
-		debug dbg.report!0( "Start receiving, n = ", text( number));
+		dbg.report!1( "Start receiving, n = ", text( number));
 
 		string[] buffer;
 		bool[] received;
@@ -145,7 +144,7 @@ private:
 
 				string data = handle!RECV( recv.getData());
 
-				debug dbg.report!2( "Part ", text( i), " is received: \n", data);
+				dbg.report!3( "Part ", text( i), " is received: \n", data);
 
 				if (data) 
 				{
@@ -157,6 +156,7 @@ private:
 		return buffer;
 	}
 
+	import core.time;
 	size_t 
 	getLost()
 	{
@@ -165,21 +165,20 @@ private:
 		{
 			ubyte[] domain = makeDomain( token, text( uniform( 1000, 9999)), __domain);
 			string answer = io(domain, STATUS).getData();
-			debug dbg.report!0("Status has been received: ", answer);
+			dbg.report!2("Status has been received: ", answer);
 
 			ready = handle!(STATUS)( answer);
+			if (! ready) sleep( dur!"seconds"(1));
 		}
 		return ready;
 	}
 
 	Packet 
-	io( ubyte[] domain, ushort type, byte tries = 3) 
-	in
+	io( ubyte[] domain, ushort type, byte tries = 3)
 	{
 		enforce( tries > 0, "Error in worker:io");
-	}
-	body
-	{
+		dbg.report!3( "TRYING IO: ", text(tries));
+
 		Packet packet = new Packet();
 		packet.id = uniform!(ushort)();
 		packet.flags = FLAGS;
@@ -192,7 +191,7 @@ private:
 		packet.addQuestion(quest);
 
 		__dns_socket.send(packet);
-
+		
 		packet = __dns_socket.receive();
 		return (packet.flags & 0b1111) == 0 ? packet : io( domain, type, --tries);
 	}
@@ -212,92 +211,97 @@ private:
 	void 
 	routine()
 	{
-		//dbg.toStd = false;
-		do {
-			ubyte[] data;
-			try
-				data = __proxy.receive();
-			catch (Throwable e) 
-				data = null;
-			if (!data) break;
-			debug dbg.report!2( cast(string) data);
+		try {
+			dbg.logLevel = __logLevel;
+			do {
+				ubyte[] data;
+				try
+					data = __proxy.receive();
+				catch (Throwable e) 
+					data = null;
+				if (!data) break;
+				dbg.report!3( cast(string) data);
 
-			// Data encoding
-			string encoded = cast(string) Base64URL.encode(data);
-			encoded = removeBase64Suffix(encoded);
+				// Data encoding
+				string encoded = cast(string) Base64URL.encode(data);
+				encoded = removeBase64Suffix(encoded);
 	
-			debug dbg.report!2( encoded);
+				dbg.report!3( encoded);
 
-			// Getting token. ------------------------------------------------------------------------
-			// Counting parameters needed:
-			// Maximum length of the one packet:
-			real chunk_length =
-				jlib.dns.types.DNS_PACKET_MAXLEN	// Maximum possible length of the DNS packet
-				- jlib.dns.types.DNS_HEADER_SIZE	// Size of the DNS header
-				-  __domain.length				// Main domain length
-				- TOKEN_MAXLEN					// Token length
-				- INDEX_MAXLEN					// Maximum length of the index of a current part
-				- PROTO_PARTS_MAXSIZE;			// Maximum parts per request in protocol we use
-			chunk_length = min( DNS_MAXPART, cast(size_t)chunk_length);
+				// Getting token. ------------------------------------------------------------------------
+				// Counting parameters needed:
+				// Maximum length of the one packet:
+				real chunk_length =
+					jlib.dns.types.DNS_PACKET_MAXLEN	// Maximum possible length of the DNS packet
+					- jlib.dns.types.DNS_HEADER_SIZE	// Size of the DNS header
+					-  __domain.length				// Main domain length
+					- TOKEN_MAXLEN					// Token length
+					- INDEX_MAXLEN					// Maximum length of the index of a current part
+					- PROTO_PARTS_MAXSIZE;			// Maximum parts per request in protocol we use
+				chunk_length = min( DNS_MAXPART, cast(size_t)chunk_length);
 
-			// Number of parts of our data:
-			auto index_count = cast(size_t)ceil( cast(real)(cast(ubyte[])encoded).length / chunk_length);
-			debug dbg.report!0( "Chunk length: ", text( chunk_length), "\nCount: ", text(index_count));
+				// Number of parts of our data:
+				auto index_count = cast(size_t)ceil( cast(real)(cast(ubyte[])encoded).length / chunk_length);
+				dbg.report!1( "Chunk length: ", text( chunk_length), "\nCount: ", text(index_count));
 
-			// Requesting token.
-			{
-				// Create a url from all data provided.
-				ubyte[] domain = makeDomain( __login, __userID, text(index_count), __domain);
-
-				// Send it and get a response.
-				string answer = io(domain, REGISTRATION).getData();
-
-				// We have a token!
-				control(TOKEN,answer);
-				token = answer[TOKEN.length .. $];
-				debug dbg.report!0("Token found: ", text(token), "\nSending data...");
-			}
-			// Token has been got. ----------------------------------------------------------------
-
-			// Sending all the data to the server. ------------------------------------------------
-			// Cut encoded data into index_count parts.
-			{
-				parts = cut( encoded, index_count, cast(size_t)chunk_length);
-				sendParts( parts);		
-				// All parts have been sent. ----------------------------------------------------------
-			}
-
-			// Getting lost. ----------------------------------------------------------------------
-			size_t ready;
-			{
-				ready = getLost();
-				// All lost data has been sent, now receiving. --------------------------------------------
-				if ( !ready) 
+				// Requesting token.
 				{
-					dbg.report!0("Server status request error.");
-					clientError( "DNS server has not downloaded a page in time.");
-					continue;
+					// Create a url from all data provided.
+					ubyte[] domain = makeDomain( __login, __userID, text(index_count), __domain);
+
+					// Send it and get a response.
+					dbg.report!1("before registration");
+					string answer = io(domain, REGISTRATION).getData();
+					// We have a token!
+					control(TOKEN,answer);
+					token = answer[TOKEN.length .. $];
+					dbg.report!1("Token found: ", text(token), "\nSending data...");
 				}
-				else
-					debug dbg.report!0("Server received all parts successfully... answer recieving is started");
+				// Token has been got. ----------------------------------------------------------------
 
-			}
+				// Sending all the data to the server. ------------------------------------------------
+				// Cut encoded data into index_count parts.
+				{
+					parts = cut( encoded, index_count, cast(size_t)chunk_length);
+					sendParts( parts);		
+					// All parts have been sent. ----------------------------------------------------------
+				}
 
-			// Receiving. -----------------------------------------------------------------------------
-			string recvData;
-			{
-				parts = receiveParts(ready);
-				recvData = mergeData( parts);
+				// Getting lost. ----------------------------------------------------------------------
+				size_t ready;
+				{
+					ready = getLost();
+					// All lost data has been sent, now receiving. --------------------------------------------
+					if ( !ready) 
+					{
+						dbg.report!0("Server status request error.");
+						clientError( "DNS server has not downloaded a page in time.");
+						continue;
+					}
+					else
+						dbg.report!1("Server received all parts successfully... answer recieving is started");
 
-				io( makeDomain( token, "done", __domain), STATUS);
-			}
+				}
 
-			//ubyte[] binaryData = Base64.decode( recvData);
-			debug dbg.report!2("All data received: \n", cast(string) recvData);
+				// Receiving. -----------------------------------------------------------------------------
+				string recvData;
+				{
+					parts = receiveParts(ready);
+					recvData = mergeData( parts);
 
-			ptrdiff_t ret =  __proxy.send( recvData);
-			debug dbg.report!0( "Ret: ", text([ret, recvData.length]));
-		} while ( 1);
+					io( makeDomain( token, "done", __domain), STATUS);
+				}
+
+				dbg.report!2("All data received: \n", cast(string) recvData);
+
+				ptrdiff_t ret =  __proxy.send( recvData);
+				dbg.report!1( "Ret: ", text([ret, recvData.length]));
+			} while ( 1);
+		}catch (Throwable e)
+		{
+			dbg.report!0( "Error, exception: ", e.msg, e.file);
+			clientError( e.msg);
+		}
 	}
 
 	template handle( size_t T) 
@@ -311,8 +315,7 @@ private:
 				case DONE[0 .. MIN_STATUS]:		{
 					static if ( T == SEND) return true; // All right, continue.
 					static if ( T == STATUS) return 0;
-					throw new Exception("Dones are not allowed in RECV cycle");
-					assert(0, "NO WAI");
+					assert(0, "Dones are not allowed in RECV cycle");
 				}
 				case TOKEN[0 .. MIN_STATUS]:	{
 					enforce(toControl[TOKEN.length .. $] == token, "Error: another token received."); 
@@ -352,7 +355,7 @@ private:
 		}
 	}
 
-	immutable string DefaultError = r"<html><head><title>DNS Proxy error</title></head><body>DNS Proxy has not reached remote server</body></html>";
+	static immutable string DefaultError = r"<html><head><title>DNS Proxy error</title></head><body>DNS Proxy has not reached remote server</body></html>";
 	void clientError( string name = "")
 	{
 		string error = DefaultError ~ r"<br \>" ~ name;

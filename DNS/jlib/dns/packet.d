@@ -3,32 +3,32 @@
 
 	GNU GENERAL PUBLIC LICENSE - Version 3 - 29 June 2007
 
-	This file is part of DNS Proxy project.
+	This file is part of Daria project.
 
-	DNS Proxy is free software: you can redistribute it and/or modify
+	Daria is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
 	the Free Software Foundation, either version 3 of the License, or
 	(at your option) any later version.
 
-	DNS Proxy is distributed in the hope that it will be useful,
+	Daria is distributed in the hope that it will be useful,
 	but WITHOUT ANY WARRANTY; without even the implied warranty of
 	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 	GNU General Public License for more details.
 
 	You should have received a copy of the GNU General Public License
-	along with DNS Proxy. If not, see <http://www.gnu.org/licenses/>.
+	along with Daria. If not, see <http://www.gnu.org/licenses/>.
 *************************************************************************/
 
 /**
-* Author: Nazarenko Roman <mailto: me@jtalk.me>
-* License: <http://www.gnu.org/licenses/gpl.html>
+ * Author: Nazarenko Roman <mailto: me@jtalk.me>, Schevchenko Igor.
+ * License: <http://www.gnu.org/licenses/gpl.html>
 */
 
 /**
 	This is a DNS packet module. It provides programmer-friendly interface
-	to work with DNS packets.
+	for working with DNS packets.
 
-	It would be great to understand DNS packets before use this module.
+	It would be great to understand DNS packets internals before use this module.
 */
 module jlib.dns.packet;
 
@@ -52,21 +52,20 @@ class Packet
 		Class _class;
 		ushort offset[2]; // Domain offset to use in decompression
 		bool __isProcessed; // shows whether this answer is proceeded (all 
-		// links has been changed with essential values)
+		// compression links has been changed with essential values)
 	}
 	
 	struct Answer
 	{
 		ubyte[] domain;
-		ushort offset[2];
+		ushort offset[2]; // See Question description
 		Type type;
 		Class _class;
 		TTL ttl;
 		ushort _length;
 		ubyte[] data;
 		ushort data_offset[2];
-		bool __isProcessed; // shows whether this answer is proceeded (all 
-		// links has been changed with essential values)
+		bool __isProcessed; // See Question description
 	}
 
 	/// Packet offset represents the offset of the header (deprecated)
@@ -125,7 +124,7 @@ private:
 			{
 				ubyte[2] toJumpBin = data[first .. first+2]; // copy link
 
-				// zeroize first 2 bits. They're only to make us know 
+				// zeroize first 2 bits. They're only here to let us know 
 				// about compression.
 				toJumpBin[0] &= 0b_0011_1111; 
 
@@ -156,7 +155,6 @@ protected:
 	*/
 	void 
 	parseAnswer(ushort number)
-	in
 	{
 		// Preparse all the questions
 		if (!__questions[$-1].__isProcessed)
@@ -165,9 +163,7 @@ protected:
 		// Preparse all previous answers
 		if (number)
 			parseAnswer(cast(ushort)(number-1));
-	}
-	body
-	{
+
 		// Do nothing if answer is already parsed
 		if ( __answers[number].__isProcessed)
 			return;
@@ -201,14 +197,11 @@ protected:
 	*/
 	void 
 	parseQuestion(ushort number)
-	in
 	{
 		// Parse previous questions
 		if ( number && !__questions[number-1].__isProcessed)
 			parseQuestion(cast(ushort)(number-1));
-	}
-	body
-	{
+
 		// If already processed, do nothing
 		if (__questions[number].__isProcessed)
 			return;
@@ -354,7 +347,7 @@ public:
 				data_offset[1] = cast(ushort)(current_offset += _length);
 				data = packet[10 .. 10+_length].dup; // Getting answer's data
 				// Since there're length field, we need no monkey business 
-				// to get the entire field.
+				// to get the entire answer field.
 				
 				packet = packet[10+_length .. $]; // Goto next answer
 			}
@@ -363,7 +356,9 @@ public:
 	
 	/**
 		Destructor. Deletes questions and answers to make this class be able 
-		to work in non-GC environment.
+		to work in non-GC environment. 
+
+		FIX: Does not delete :( 
 	*/
 	~this() 
 	{
@@ -372,9 +367,11 @@ public:
 	}
 
 	/**
-	Copying method. Makes a copy of this class.
-	Return:
-	A copy of the caller class
+		Copying method. Makes a copy of this class.
+		Return:
+			A copy of the caller class
+
+		It's untested and useless now.
 	*/
 	deprecated Packet copy()
 	{
@@ -395,15 +392,12 @@ public:
 
 		Returns:
 			Answer structure.
-
-		Throws:
-			An assert exception if number is out of range.
 	*/
 	Answer 
 	getAnswer(ushort number = 0)
 	in
 	{
-		assert(number < __answers.length, r"Number is out of range in answers");
+		assert( number < __answers.length, r"Number is out of range in answers");
 	}
 	body
 	{
@@ -451,7 +445,11 @@ public:
 	getData(ushort number = 0)
 	in
 	{
-		assert(number < __answers.length, r"Number is out of range in answers' data");
+		assert( number < __answers.length, r"Number is out of range in answers' data");
+	}
+	out(result)
+	{
+		assert( result, "Empty string");
 	}
 	body
 	{
@@ -461,7 +459,7 @@ public:
 				cast(string) __answers[number].data);
 	}
 	
-	/// Making data to send.
+	/// Compiling data to send.
 	/**
 		Adds the question specified to the questions array.
 		
@@ -470,6 +468,14 @@ public:
 	*/
 	void 
 	addQuestion(Question toAdd)
+	in
+	{
+		assert( toAdd.type < 1);
+		assert( toAdd.type > ushort.max);
+		assert( toAdd._class < 1);
+		assert( toAdd._class > ushort.max);
+	}
+	body
 	{
 		__questions ~= toAdd;
 	}
@@ -482,6 +488,12 @@ public:
 	*/
 	void 
 	addAnswer(Answer toAdd)
+	in
+	{
+		assert( toAdd.type < 1);
+		assert( toAdd.type > ushort.max);
+	}
+	body
 	{
 		__answers ~= toAdd;
 	}
@@ -498,6 +510,11 @@ public:
 	*/
 	ubyte[] 
 	makePacket()
+	out(result)
+	{
+		assert( result);
+	}
+	body
 	{
 		alias nativeToBigEndian ntb;
 		ubyte[] packet = (

@@ -3,24 +3,24 @@
 
 	GNU GENERAL PUBLIC LICENSE - Version 3 - 29 June 2007
 
-	This file is part of DNS Proxy project.
+	This file is part of Daria project.
 
-	DNS Proxy is free software: you can redistribute it and/or modify
+	Daria is free software: you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
 	the Free Software Foundation, either version 3 of the License, or
 	(at your option) any later version.
 
-	DNS Proxy is distributed in the hope that it will be useful,
+	Daria is distributed in the hope that it will be useful,
 	but WITHOUT ANY WARRANTY; without even the implied warranty of
 	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 	GNU General Public License for more details.
 
 	You should have received a copy of the GNU General Public License
-	along with DNS Proxy. If not, see <http://www.gnu.org/licenses/>.
+	along with Daria. If not, see <http://www.gnu.org/licenses/>.
 *************************************************************************/
 
 /**
- * Author: Nazarenko Roman <mailto: me@jtalk.me>
+ * Author: Nazarenko Roman <mailto: me@jtalk.me>, Shevchenko Igor
  * License: <http://www.gnu.org/licenses/gpl.html>
  */
 
@@ -32,11 +32,10 @@ module jlib.dns.core;
 
 import std.socket : UdpSocket, Address, InternetAddress, getAddress, SocketOSException, wouldHaveBlocked;
 import std.exception : enforce;
-import std.bitmanip : nativeToBigEndian;
 import std.array : empty;
+debug import std.stdio : writeln;
 
 import jlib.dns.packet;
-
 public import jlib.dns.types;
 
 private const size_t	DNS_HEADER_SIZE = 12; 
@@ -47,14 +46,14 @@ private const size_t	DNS_BUFFER_SIZE = 512; /// The size of the receive buffer o
 	dns_socket is a class that makes friendly implementations of the standard 
 	DNS resolving routines representing them in readable form.
 
-	It does not implement all the standard query types, only some frequently 
-	used ones.
+	It converts some frequently used types (such as A) to the readable form, and
+	represents all the other in simple binary form.
  */
 class DnsSocket : UdpSocket
 {
 	/// Server initialization part
 
-	private Address				__dns_server; /// Operating system's DNS server
+	private Address				__dns_server; /// Must be operating system's DNS server
 	private immutable ushort	__dns_port = 53; /// Standard DNS port
 
 	/**
@@ -62,7 +61,7 @@ class DnsSocket : UdpSocket
 		Doesn't work for now, just putting a google dns address to the __dns_server 
 		variable.
 	 
-		User classes may be able to recall the init_server routine if something goes
+		User classes may recall the init_server routine if something goes
 		wrong. 
 
 		Params:
@@ -101,26 +100,21 @@ class DnsSocket : UdpSocket
 	 */
 	protected void 
 	bind(string address = "", ushort port = 0)
-	in
 	{
 		if (port == 0)
 			port = InternetAddress.PORT_ANY;
 		if (address.length == 0)
 			address = "0.0.0.0";
-	}
-	body
-	{
-		super.bind(
-				   getAddress( address, port)[0] ); // May cause a problem4
+		super.bind(getAddress(address, port)[0]); // May cause a problem
 	}
 	
 public:
 	/** 
 		The default constructor. Calls all the initial routines and
-		makes the class ready to work with the DNS.
+		makes the class ready to work with DNS.
 	 */
 	this() 
-	{ 
+	{
 		super();
 		init_server();	
 		init();
@@ -140,14 +134,17 @@ public:
 	/** 
 		Destructor. Frees the dns server variable (to use in non-GC systems), but 
 		feature may work wrong.
+
+		FIX: now makes nothing since GC is not able to handle memory deletion.
 	 */
 	~this() 
 	{
-		//delete __dns_server; // Untested! 
+		//delete __dns_server; // Damn GC, it falls if memory is already cleared.
 	}
 	
 	/// IO operations
-	private uint __buffer_s;
+	private uint __buffer_s; // 
+
 	/** 
 		Sends the packet to the DNS server in this class. 
 	
@@ -205,6 +202,8 @@ public:
 
 			Returns:
 				string with the current DNS address.
+
+			It will not work without rebinding.
 		*/
 		string address() { return __dns_server.toAddrString; }
 		string address(string new_addr) { __dns_server = getAddress( new_addr, this.__dns_port)[0]; return new_addr; }
@@ -221,37 +220,4 @@ public:
 		size_t buffer_s() { return __buffer_s; }
 		size_t buffer_s(size_t newsize) { __buffer_s = newsize > 0 ? newsize : DNS_BUFFER_SIZE; return __buffer_s; }
 	}
-
-	/// Deprecated methods, they will be removed as soon as possible.
-	//deprecated ubyte[] 
-	//    createHeader(ushort ID, ushort flags, ushort questions) 
-	//{
-	//    alias nativeToBigEndian ntb;
-	//    return (
-	//            ntb(ID) ~
-	//            ntb(flags) ~
-	//            ntb(questions) ~
-	//            new ubyte[6] );
-	//}
-	//deprecated ubyte[] 
-	//    createPacket(ubyte[] header, string domain, entry_type entry, io_type io) 
-	//{
-	//    return ( 
-	//            header ~ 
-	//            domainToRequest(domain) ~ 
-	//            0 ~
-	//            nativeToBigEndian(cast(ushort) entry) ~ 
-	//            nativeToBigEndian(cast(ushort) io) ~ 
-	//            0 );
-	//}
-	//deprecated private ubyte[] 
-	//    domainToRequest(string domain)
-	//{
-	//    string[] domains = split(domain, ".");
-	//    ubyte[] acc;
-	//    foreach( ref dom; domains)
-	//        acc ~= ( cast(ubyte) dom.length
-	//                ~ dom );
-	//    return acc;
-	//}
 }
