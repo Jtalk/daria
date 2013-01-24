@@ -1,5 +1,5 @@
 /***********************************************************************
-  Copyright (C) 2012 Nazarenko Roman
+  Copyright (C) 2012-2013 Roman Nazarenko.
 
   GNU GENERAL PUBLIC LICENSE - Version 3 - 29 June 2007
 
@@ -45,7 +45,7 @@ static {
   File* logfile = void; /// Logfile
   bool toStd; /// Will dbg output to tty.
   bool toLog; /// Will dbg output to logfile.
-  size_t logLevel;
+  byte logLevel;
 
   /// Creates default logfile.
   static this()
