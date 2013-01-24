@@ -1,5 +1,5 @@
 /***********************************************************************
-  Copyright (C) 2012 Nazarenko Roman
+  Copyright (C) 2012-2013 Roman Nazarenko.
 
   GNU GENERAL PUBLIC LICENSE - Version 3 - 29 June 2007
 
@@ -60,10 +60,7 @@ void main(string[] argv)
 
   version(Windows)
     switchersOpt[FORKING] = false;
-
-  dbg.logLevel = numOpt[LOGLEVEL];
-
-
+  dbg.logLevel = cast(byte) numOpt[LOGLEVEL]; // There's much less levels than 256... 
   assert(!textOpt[LOGIN].empty || !passwd.empty, "Error: no login or password presented");
   // ATTENTION! NEEDED!
   debug {
@@ -72,44 +69,32 @@ void main(string[] argv)
     textOpt[DOMAIN] = "d.jtalk.me";
     numOpt[LOGLEVEL] = dbg.logLevel = 3;
   }
-
   dbg.report!1("Start test:\n", textOpt[LOGIN], ":", passwd, ":", text(textOpt[LOGIN].empty));
-
   // Look whether there're a first dot.
   if (textOpt[DOMAIN][0] == '.') 
     textOpt[DOMAIN] = textOpt[DOMAIN][ 1 .. $];
-
-
     Proxy proxy = new Proxy(Proxy.default_address);
     proxy.listen(1);
-
     UserID userID = Base64URL.encode(mkHash(textOpt[LOGIN], passwd));
-
     // Remove '='s from the end of an ID
     userID = removeBase64Suffix(userID);
-
     ThreadGroup threads = new ThreadGroup();
     Proxy accepted;
     // Main cycle
   try {
     while(1) {  
       accepted = proxy.accept();
-
-      
       threads.add(
-            new Worker(textOpt[LOGIN], userID, textOpt[DNS_SERVER], accepted, textOpt[DOMAIN], numOpt[LOGLEVEL] )
+            new Worker(textOpt[LOGIN], userID, textOpt[DNS_SERVER], accepted, textOpt[DOMAIN], cast(byte)numOpt[LOGLEVEL] )
             );
-
       foreach(ref curThread; threads)
         if (!curThread.isRunning )
           threads.remove(curThread);
     }
   }
-  catch (Throwable ex)
-  {
+  catch (Throwable ex) {
     writeln(ex.msg, ex.file);
     writeln("STOP");
   }
-  writeln("BICYCLE");
 }
 
