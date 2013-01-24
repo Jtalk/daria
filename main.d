@@ -44,38 +44,40 @@ static import dbg;
 
 void main(string[] argv)
 {
-  string[]  textOpt = new string[ TEXT_OPTIONS_SIZE ];
-  passwd_type passwd;        // May use encryption later, just a string for now
-  int[]  numOpt = new int[ NUMERIC_OPTIONS_SIZE ];
-  bool[] switchersOpt = new bool[ SWITCHER_OPTIONS_SIZE ];
+  byte logLevel;
+  bool isForking;
+  size_t bufferSize;
+  string domain, dnsServerAddress, login;
+  passwd_type passwd;
+  
   getopt(argv,
-       "login|l", &(textOpt[LOGIN]),
+       "login|l", &login,
        "password|p", &passwd,
-       "server|s", &textOpt[DNS_SERVER],
-       "domain|d", &textOpt[DOMAIN],
-       "buffer-size|b", &numOpt[BUFFER_SIZE],
-       "forking|f", &switchersOpt[FORKING],
-       "error|e", &numOpt[LOGLEVEL],
+       "server|s", &dnsServerAddress,
+       "domain|d", &domain,
+       "buffer-size|b", &bufferSize,
+       "forking|f", &isForking,
+       "error|e", &logLevel,
     );
 
   version(Windows)
-    switchersOpt[FORKING] = false;
-  dbg.logLevel = cast(byte) numOpt[LOGLEVEL]; // There's much less levels than 256... 
-  assert(!textOpt[LOGIN].empty || !passwd.empty, "Error: no login or password presented");
+    isForking = false;
+  dbg.logLevel = logLevel; // There's much less levels than 256... 
+  assert(!login.empty || !passwd.empty, "Error: no login or password presented");
   // ATTENTION! NEEDED!
   debug {
-    textOpt[LOGIN] = "login";
+    login = "login";
     passwd = "passwd";
-    textOpt[DOMAIN] = "d.jtalk.me";
-    numOpt[LOGLEVEL] = dbg.logLevel = 3;
+    domain = "d.jtalk.me";
+    logLevel = dbg.logLevel = 3;
   }
-  dbg.report!1("Start test:\n", textOpt[LOGIN], ":", passwd, ":", text(textOpt[LOGIN].empty));
+  dbg.report!1("Start test:\n", login, ":", passwd, ":", text(login.empty));
   // Look whether there're a first dot.
-  if (textOpt[DOMAIN][0] == '.') 
-    textOpt[DOMAIN] = textOpt[DOMAIN][ 1 .. $];
+  if (domain[0] == '.') 
+    domain = domain[ 1 .. $];
     Proxy proxy = new Proxy(Proxy.default_address);
     proxy.listen(1);
-    UserID userID = Base64URL.encode(mkHash(textOpt[LOGIN], passwd));
+    UserID userID = Base64URL.encode(mkHash(login, passwd));
     // Remove '='s from the end of an ID
     userID = removeBase64Suffix(userID);
     ThreadGroup threads = new ThreadGroup();
@@ -85,7 +87,7 @@ void main(string[] argv)
     while(1) {  
       accepted = proxy.accept();
       threads.add(
-            new Worker(textOpt[LOGIN], userID, textOpt[DNS_SERVER], accepted, textOpt[DOMAIN], cast(byte)numOpt[LOGLEVEL] )
+            new Worker(login, userID, dnsServerAddress, accepted, domain, logLevel )
             );
       foreach(ref curThread; threads)
         if (!curThread.isRunning )
