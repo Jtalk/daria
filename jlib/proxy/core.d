@@ -35,6 +35,7 @@ import std.conv : text;
 import std.bitmanip : bigEndianToNative, nativeToBigEndian;
 import std.exception : enforce;
 debug import std.cstream;
+import dbg;
 
 
 private const size_t  PROXY_BUFFER_SIZE = 1024*4;  
@@ -49,19 +50,28 @@ private:
     
     static this()
     {
-      default_address = getAddress("127.0.0.1", 808)[0];
+      default_address = getAddress("localhost", 2013)[0];
     }
   }
   
+  void bindLocal(const Address toListen) {
+    report!2("Trying to bind proxy server at ", toListen.text);
+    bind(cast(Address)toListen);
+    report!2("Success!");
+  }
+  
 public:  
-  this()
-  {
+  this() {
     super();
   }
-  this(const Address toListen)
-  {
+  this(const Address toListen) {
     super(Socket.addressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
-    bind(cast(Address)toListen );
+    bindLocal(toListen);
+  }
+  this(ushort port) {
+    super(Socket.addressFamily.INET, SocketType.STREAM, ProtocolType.TCP);
+    const Address toListen = port != 0 ? getAddress("localhost", port)[0] : default_address;
+    bindLocal(toListen);
   }
   ~this() {}
   
@@ -87,7 +97,7 @@ public:
   
   override void connect(Address)
   {
-    assert(0, r"Connection from SOCKS server isn't allowed");
+    assert(0, r"Connection from proxy server isn't allowed");
   }
   
   private alias Socket.accept oldAccept;
