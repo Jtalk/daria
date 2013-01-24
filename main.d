@@ -59,12 +59,10 @@ void main(string[] argv)
        "forking|f", &isForking,
        "error|e", &logLevel,
     );
-
   version(Windows)
-    isForking = false;
-  dbg.logLevel = logLevel; // There's much less levels than 256... 
+    isForking = false; // Windows has no fork()
+  dbg.logLevel = logLevel;
   assert(!login.empty || !passwd.empty, "Error: no login or password presented");
-  // ATTENTION! NEEDED!
   debug {
     login = "login";
     passwd = "passwd";
@@ -75,20 +73,21 @@ void main(string[] argv)
   // Look whether there're a first dot.
   if (domain[0] == '.') 
     domain = domain[ 1 .. $];
-    Proxy proxy = new Proxy(Proxy.default_address);
-    proxy.listen(1);
-    UserID userID = Base64URL.encode(mkHash(login, passwd));
-    // Remove '='s from the end of an ID
-    userID = removeBase64Suffix(userID);
-    ThreadGroup threads = new ThreadGroup();
-    Proxy accepted;
-    // Main cycle
+  Proxy proxy = new Proxy(Proxy.default_address);
+  proxy.listen(1);
+  UserID userID = Base64URL.encode(mkHash(login, passwd));
+  // Remove '='s from the end of an ID
+  userID = removeBase64Suffix(userID);
+  ThreadGroup threads = new ThreadGroup();
+  Proxy accepted;
+  // Main cycle
+  // TODO: Try to remove exception handling - it's useless here, at least in releases.
   try {
     while(1) {  
       accepted = proxy.accept();
-      threads.add(
-            new Worker(login, userID, dnsServerAddress, accepted, domain, logLevel )
-            );
+      threads.add( // We transfer loglevel to worker cuz worker will use it's own logger.
+        new Worker(login, userID, dnsServerAddress, accepted, domain, logLevel)
+      );
       foreach(ref curThread; threads)
         if (!curThread.isRunning )
           threads.remove(curThread);

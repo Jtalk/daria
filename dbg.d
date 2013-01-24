@@ -68,7 +68,6 @@ static {
           logfile.write(str);
         logfile.writeln(end);
       }
-
       if (toStd)
       {
         writeln(start);
