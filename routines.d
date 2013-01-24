@@ -26,7 +26,6 @@
 
 module routines;
 
-import std.md5 : sum;
 import std.exception : enforce;
 import std.conv;
 import std.random : uniform;
@@ -42,14 +41,6 @@ removeBase64Suffix(string base64)
   size_t counter = base64.length;
   while(base64[--counter] == '=') {}
   return base64[ 0 .. counter+1];
-}
-
-ubyte[16] 
-mkHash(string login, passwd_type passwd /* NOT SURE COUNT FUCK THIS SHIT */)
-{
-  ubyte[16] digest;
-  sum(digest, login, passwd);
-  return digest;
 }
 
 pure @safe string 

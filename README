@@ -8,7 +8,7 @@ Server can be found here: https://bitbucket.org/__jtalk/arya
 Command: 
   ./daria --login=|-lLOGIN --password=|-pPASSWORD --server=|-sDNS_SERVER 
     --domain=|-dDOMAIN [ --buffer-size=|-bRECEIVE_BUFFER_SIZE --forking|-f
-    --error=|-eLOGLEVEL ]
+    --error=|-eLOGLEVEL --port=PORT]
     
     LOGIN, PASSWORD:
       Login and password for this client. Now they can be any strings.
@@ -31,6 +31,9 @@ Command:
       
     LOGLEVEL:
       Logging level. The greater it is, the bigger logs would be.
+      
+    PORT:
+      Local port for the proxy server to bind.
       
 Server does not provide any authorization now, it's just a test prototype, so
 use it on your own risk.
