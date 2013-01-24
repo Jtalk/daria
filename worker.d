@@ -62,10 +62,10 @@ private:
   string    __domain = void;
   string    token = void;
   string[]  parts = void;
-  size_t    __logLevel = void;
+  byte      __logLevel = void;
 
 public:
-  this(string login, UserID userID, string dns_server, Proxy proxy, string domain, size_t logLevel)
+  this(string login, UserID userID, string dns_server, Proxy proxy, string domain, byte logLevel)
   {
     __login = login;
     __userID = userID;
