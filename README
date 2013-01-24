@@ -7,27 +7,33 @@ Server can be found here: https://bitbucket.org/__jtalk/arya
 
 Command: 
   ./daria --login=|-lLOGIN --password=|-pPASSWORD --server=|-sDNS_SERVER 
-    --domain=|-dDOMAIN [ --buffer-size=|-bRECEIVE_BUFFER_SIZE --forking|-f --error=|-eLOGLEVEL ]
+    --domain=|-dDOMAIN [ --buffer-size=|-bRECEIVE_BUFFER_SIZE --forking|-f
+    --error=|-eLOGLEVEL ]
     
     LOGIN, PASSWORD:
       Login and password for this client. Now they can be any strings.
        
     DNS_SERVER:
-      DNS server for that closed network. It will be used to reach remote Arya DNS server.
+      DNS server for that closed network. It will be used to reach remote Arya
+      server.
       
     DOMAIN:
-      Domain for which Arya DNS is authoritative. You might need to register your own and check
+      Domain for which Arya DNS is authoritative. You might need to register
+      your own and check
       its NS entry to point to the Arya server.
       
     RECEIVE_BUFFER_SIZE:
       Size for receive buffer. Defaults are quite good.
       
     -f | --forking:
-      Make this server a daemon. Only forks for POSIX systems, such as Linux or *BSD.
+      Make this server a daemon. Only forks for POSIX systems, such as Linux or
+      *BSD.
       
     LOGLEVEL:
       Logging level. The greater it is, the bigger logs would be.
       
-Server does not provide any authorization now, it's just a test prototype, so use it on your own risk.
-There's no encryption for data transfered, so it's better not to use that technique to transfer private data.
+Server does not provide any authorization now, it's just a test prototype, so
+use it on your own risk.
+There's no encryption for data transfered, so it's better not to use that
+technique to transfer private data.
     
